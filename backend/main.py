@@ -5,7 +5,11 @@ from typing import List, Optional
 
 from ml_model import get_model
 from parser import get_resume_parser, get_job_parser
-from database import init_db, ResumeDB, JobDB, MatchDB
+import os
+if os.getenv('DATABASE_URL'):
+    from database_postgres import init_db, ResumeDB, JobDB, MatchDB
+else:
+    from database import init_db, ResumeDB, JobDB, MatchDB
 
 app = FastAPI()
 
@@ -19,9 +23,16 @@ app.add_middleware(
 
 init_db()
 
-ml_model = get_model()
+# Lazy load model to save memory
+ml_model = None
 resume_parser = get_resume_parser()
 job_parser = get_job_parser()
+
+def get_ml_model():
+    global ml_model
+    if ml_model is None:
+        ml_model = get_model()
+    return ml_model
 
 class JobDescription(BaseModel):
     title: str
@@ -42,7 +53,7 @@ async def upload_resume(file: UploadFile = File(...)):
         content = await file.read()
         parsed_data = resume_parser.parse_resume(content)
         
-        embedding = ml_model.encode(parsed_data['text'])
+        embedding = get_ml_model().encode(parsed_data['text'])
         
         resume_id = ResumeDB.insert_resume(
             filename=file.filename,
@@ -67,7 +78,7 @@ async def upload_resume(file: UploadFile = File(...)):
 @app.post("/api/jobs")
 async def add_job(job: JobDescription):
     parsed_job = job_parser.parse_job_description(job.description)
-    embedding = ml_model.encode(job.description)
+    embedding = get_ml_model().encode(job.description)
     
     job_id = JobDB.insert_job(
         title=job.title,
@@ -97,7 +108,7 @@ async def get_matches(resume_id: int, limit: int = 10):
     matches = []
     
     for job in jobs:
-        overall_score, breakdown = ml_model.calculate_match_score(resume_data, job)
+        overall_score, breakdown = get_ml_model().calculate_match_score(resume_data, job)
         
         # Save match result to database
         MatchDB.save_match_result(
@@ -146,7 +157,7 @@ async def match_job(request: MatchJobRequest):
         raise HTTPException(404, "Resume not found")
     
     parsed_job = job_parser.parse_job_description(request.job_description)
-    job_embedding = ml_model.encode(request.job_description)
+    job_embedding = get_ml_model().encode(request.job_description)
     
     job_data = {
         'embedding': job_embedding,
@@ -155,7 +166,7 @@ async def match_job(request: MatchJobRequest):
         'education_required': parsed_job['education_required']
     }
     
-    overall_score, breakdown = ml_model.calculate_match_score(resume_data, job_data)
+    overall_score, breakdown = get_ml_model().calculate_match_score(resume_data, job_data)
     
     return {
         "score": breakdown['overall_score'],
