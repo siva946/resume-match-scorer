@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from ml_model import get_model
 from parser import get_resume_parser, get_job_parser
-from database import init_db, ResumeDB, JobDB
+from database import init_db, ResumeDB, JobDB, MatchDB
 
 app = FastAPI()
 
@@ -17,10 +17,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize database
 init_db()
 
-# Get model and parser instances
 ml_model = get_model()
 resume_parser = get_resume_parser()
 job_parser = get_job_parser()
@@ -30,13 +28,6 @@ class JobDescription(BaseModel):
     company: str
     description: str
     url: Optional[str] = None
-
-class MatchResult(BaseModel):
-    job_id: int
-    title: str
-    company: str
-    score: float
-    description: str
 
 class MatchJobRequest(BaseModel):
     resume_id: int
@@ -59,9 +50,7 @@ async def upload_resume(file: UploadFile = File(...)):
             embedding=embedding,
             skills=parsed_data['skills'],
             experience_years=parsed_data['experience_years'],
-            experience_entries=parsed_data['experience_entries'],
-            education_level=parsed_data['education_level'],
-            degrees=parsed_data['degrees']
+            education=parsed_data['education']
         )
         
         return {
@@ -70,7 +59,7 @@ async def upload_resume(file: UploadFile = File(...)):
             "text_length": len(parsed_data['text']),
             "skills": parsed_data['skills'],
             "experience_years": parsed_data['experience_years'],
-            "education_level": parsed_data['education_level']
+            "education": parsed_data['education']
         }
     except Exception as e:
         raise HTTPException(500, f"Error processing PDF: {str(e)}")
@@ -91,7 +80,12 @@ async def add_job(job: JobDescription):
         education_required=parsed_job['education_required']
     )
     
-    return {"id": job_id, "title": job.title}
+    return {
+        "id": job_id,
+        "title": job.title,
+        "required_skills": parsed_job['required_skills'],
+        "experience_required": parsed_job['experience_required']
+    }
 
 @app.get("/api/matches/{resume_id}")
 async def get_matches(resume_id: int, limit: int = 10):
@@ -103,13 +97,33 @@ async def get_matches(resume_id: int, limit: int = 10):
     matches = []
     
     for job in jobs:
-        score = ml_model.calculate_match_score(resume_data, job)
+        overall_score, breakdown = ml_model.calculate_match_score(resume_data, job)
+        
+        # Save match result to database
+        MatchDB.save_match_result(
+            resume_id=resume_id,
+            job_id=job['id'],
+            overall_score=breakdown['overall_score'],
+            skills_score=breakdown['skills_score'],
+            experience_score=breakdown['experience_score'],
+            education_score=breakdown['education_score'],
+            semantic_score=breakdown['semantic_score'],
+            matched_skills=breakdown['matched_skills'],
+            missing_skills=breakdown['missing_skills'],
+            total_required=breakdown['total_required_skills']
+        )
         
         matches.append({
             "job_id": job['id'],
             "title": job['title'],
             "company": job['company'],
-            "score": score,
+            "score": breakdown['overall_score'],
+            "skills_score": breakdown['skills_score'],
+            "experience_score": breakdown['experience_score'],
+            "education_score": breakdown['education_score'],
+            "semantic_score": breakdown['semantic_score'],
+            "matched_skills": breakdown['matched_skills'],
+            "missing_skills": breakdown['missing_skills'],
             "description": job['description'][:200],
             "url": job['url']
         })
@@ -141,13 +155,53 @@ async def match_job(request: MatchJobRequest):
         'education_required': parsed_job['education_required']
     }
     
-    score = ml_model.calculate_match_score(resume_data, job_data)
+    overall_score, breakdown = ml_model.calculate_match_score(resume_data, job_data)
     
     return {
-        "score": score,
-        "matched_skills": list(set(resume_data['skills']) & set(parsed_job['required_skills'])),
-        "missing_skills": list(set(parsed_job['required_skills']) - set(resume_data['skills'])),
+        "score": breakdown['overall_score'],
+        "breakdown": {
+            "skills_score": breakdown['skills_score'],
+            "experience_score": breakdown['experience_score'],
+            "education_score": breakdown['education_score'],
+            "semantic_score": breakdown['semantic_score']
+        },
+        "matched_skills": breakdown['matched_skills'],
+        "missing_skills": breakdown['missing_skills'],
         "experience_match": resume_data['experience_years'] >= parsed_job['experience_required']
+    }
+
+@app.get("/api/debug/resume/{resume_id}")
+async def debug_resume(resume_id: int):
+    resume_data = ResumeDB.get_resume(resume_id)
+    if not resume_data:
+        raise HTTPException(404, "Resume not found")
+    return {
+        "skills": resume_data['skills'],
+        "experience_years": resume_data['experience_years'],
+        "education": resume_data['education']
+    }
+
+@app.get("/api/debug/job/{job_id}")
+async def debug_job(job_id: int):
+    job_data = JobDB.get_job(job_id)
+    if not job_data:
+        raise HTTPException(404, "Job not found")
+    return {
+        "required_skills": job_data['required_skills'],
+        "experience_required": job_data['experience_required'],
+        "education_required": job_data['education_required']
+    }
+
+@app.post("/api/test-extraction")
+async def test_extraction(request: dict):
+    """Test endpoint to see what's being extracted from job description"""
+    description = request.get('description', '')
+    parsed = job_parser.parse_job_description(description)
+    return {
+        "description_length": len(description),
+        "extracted_skills": parsed['required_skills'],
+        "extracted_experience": parsed['experience_required'],
+        "extracted_education": parsed['education_required']
     }
 
 @app.get("/health")

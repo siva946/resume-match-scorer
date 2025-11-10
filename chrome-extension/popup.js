@@ -10,6 +10,11 @@ async function loadData() {
       fetch(`${API_URL}/api/jobs`)
     ]);
 
+    if (!resumesRes.ok || !jobsRes.ok) {
+      showStatus('Backend error - check if server is running', 'error');
+      return;
+    }
+
     resumes = await resumesRes.json();
     jobs = await jobsRes.json();
 
@@ -25,7 +30,8 @@ async function loadData() {
       ).join('');
     }
   } catch (error) {
-    showStatus('Backend not running', 'error');
+    showStatus('Backend not running on localhost:8000', 'error');
+    console.error('Connection error:', error);
   }
 }
 
@@ -57,7 +63,7 @@ document.getElementById('showMatch').addEventListener('click', async () => {
     });
 
     const result = await response.json();
-    const score = Math.round(result.score * 100);
+    const score = Math.round(result.score);
     
     showStatus(`Match Score: ${score}% - ${getScoreLabel(score)}`, 'success');
   } catch (error) {
@@ -109,6 +115,25 @@ document.getElementById('saveJob').addEventListener('click', async () => {
 });
 
 function extractJobDescription() {
+  // Naukri.com specific extraction
+  if (window.location.hostname.includes('naukri.com')) {
+    const jobDesc = document.querySelector('.job-description, .jd-description, [class*="description"], .styles_JDC__dang-inner-html__h0K4t');
+    if (jobDesc) return jobDesc.innerText.substring(0, 5000);
+  }
+  
+  // Indeed.com specific extraction
+  if (window.location.hostname.includes('indeed.com')) {
+    const jobDesc = document.querySelector('#jobDescriptionText, .jobsearch-jobDescriptionText');
+    if (jobDesc) return jobDesc.innerText.substring(0, 5000);
+  }
+  
+  // LinkedIn specific extraction
+  if (window.location.hostname.includes('linkedin.com')) {
+    const jobDesc = document.querySelector('.jobs-description, .jobs-box__html-content');
+    if (jobDesc) return jobDesc.innerText.substring(0, 5000);
+  }
+  
+  // Fallback to body text
   const bodyText = document.body.innerText;
   return bodyText.substring(0, 5000);
 }

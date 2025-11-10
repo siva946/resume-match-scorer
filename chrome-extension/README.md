@@ -1,4 +1,4 @@
-# Jobalytics Chrome Extension
+# ResumSync Chrome Extension
 
 ## Installation
 
@@ -11,10 +11,10 @@
 ## Usage
 
 1. Navigate to any job posting page (LinkedIn, Indeed, company careers page, etc.)
-2. Click the Jobalytics extension icon
+2. Click the ResumSync extension icon
 3. Enter the job title and company name
 4. Click "Extract & Send Job"
-5. The page content will be extracted and sent to your local Jobalytics backend
+5. The page content will be extracted and sent to your local ResumSync backend
 
 ## Requirements
 

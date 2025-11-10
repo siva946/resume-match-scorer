@@ -82,7 +82,7 @@ function App() {
   return (
     <div className="App">
       <header>
-        <h1>Jobalytics</h1>
+        <h1>ResumSync</h1>
         <p>Resume & Job Matching Platform</p>
       </header>
 

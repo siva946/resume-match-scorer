@@ -1,59 +1,57 @@
 import re
-from typing import Dict, List, Tuple
-import PyPDF2
+import pdfplumber
+from typing import Dict, List, Set
 import io
 
 class ResumeParser:
-    SKILLS_DATABASE = {
-        'programming': ['python', 'java', 'javascript', 'typescript', 'c++', 'c#', 'go', 'rust', 'scala', 'kotlin', 'swift', 'php', 'ruby', 'r', 'matlab', 'perl'],
-        'web': ['react', 'angular', 'vue', 'node.js', 'express', 'django', 'flask', 'fastapi', 'spring', 'asp.net', 'html', 'css', 'sass', 'webpack', 'next.js'],
-        'database': ['sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'cassandra', 'dynamodb', 'oracle', 'sqlite', 'elasticsearch'],
-        'cloud': ['aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'ansible', 'jenkins', 'ci/cd', 'devops'],
-        'data': ['machine learning', 'deep learning', 'ai', 'data science', 'tensorflow', 'pytorch', 'pandas', 'numpy', 'scikit-learn', 'spark', 'hadoop', 'kafka'],
-        'tools': ['git', 'jira', 'confluence', 'linux', 'bash', 'powershell', 'vim', 'vscode', 'intellij']
-    }
-    
-    DEGREE_LEVELS = {
-        'phd': 3, 'ph.d': 3, 'doctorate': 3, 'doctoral': 3,
-        'master': 2, 'masters': 2, 'mba': 2, 'm.s': 2, 'm.tech': 2, 'm.e': 2, 'm.sc': 2,
-        'bachelor': 1, 'bachelors': 1, 'b.s': 1, 'b.tech': 1, 'b.e': 1, 'b.sc': 1, 'undergraduate': 1
-    }
+    SKILLS = [
+        'python', 'java', 'javascript', 'typescript', 'c++', 'c#', 'go', 'rust', 'ruby', 'php', 'swift', 'kotlin', 'scala',
+        'react', 'angular', 'vue', 'node.js', 'nodejs', 'express', 'django', 'flask', 'fastapi', 'spring', 'asp.net',
+        'html', 'css', 'sass', 'less', 'bootstrap', 'tailwind', 'jquery', 'webpack', 'next.js', 'nuxt',
+        'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'cassandra', 'dynamodb', 'oracle', 'sqlite', 'elasticsearch',
+        'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'ansible', 'jenkins', 'ci/cd', 'devops',
+        'machine learning', 'deep learning', 'ai', 'nlp', 'computer vision', 'data science', 'tensorflow', 'pytorch', 
+        'pandas', 'numpy', 'scikit-learn', 'spark', 'hadoop', 'kafka', 'airflow',
+        'git', 'github', 'gitlab', 'bitbucket', 'jira', 'confluence', 'agile', 'scrum', 'kanban',
+        'linux', 'unix', 'bash', 'powershell', 'windows', 'macos',
+        'rest api', 'graphql', 'microservices', 'serverless', 'api', 'restful',
+        'testing', 'unit testing', 'integration testing', 'jest', 'pytest', 'selenium', 'cypress',
+        'figma', 'sketch', 'adobe xd', 'photoshop', 'illustrator',
+        'excel', 'powerpoint', 'word', 'google sheets', 'tableau', 'power bi',
+        'communication', 'leadership', 'teamwork', 'problem solving', 'analytical', 'critical thinking'
+    ]
     
     def parse_pdf(self, file_content: bytes) -> str:
-        """Extract text from PDF with improved parsing"""
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+        """Extract text using pdfplumber"""
         text_parts = []
+        with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
         
-        for page in pdf_reader.pages:
-            page_text = page.extract_text() or ""
-            # Clean up common PDF artifacts
-            page_text = re.sub(r'\s+', ' ', page_text)
-            page_text = re.sub(r'[^\x00-\x7F]+', ' ', page_text)
-            text_parts.append(page_text)
-        
-        full_text = " ".join(text_parts)
+        full_text = "\n".join(text_parts)
         return full_text.strip()
     
     def extract_skills(self, text: str) -> List[str]:
-        """Extract skills with improved detection"""
+        """Extract skills from text"""
         text_lower = text.lower()
+        text_lower = re.sub(r'[^\w\s.#+/-]', ' ', text_lower)
+        
         found_skills = []
+        for skill in self.SKILLS:
+            skill_normalized = skill.replace('.', r'\.').replace('+', r'\+')
+            if re.search(r'\b' + skill_normalized + r'\b', text_lower):
+                found_skills.append(skill)
         
-        for category, skills in self.SKILLS_DATABASE.items():
-            for skill in skills:
-                # Word boundary matching for accuracy
-                pattern = r'\b' + re.escape(skill) + r'\b'
-                if re.search(pattern, text_lower):
-                    found_skills.append(skill)
-        
-        return list(set(found_skills))
+        return found_skills
     
-    def extract_experience(self, text: str) -> Tuple[float, List[Dict]]:
-        """Extract total years and experience entries"""
+    def extract_experience_years(self, text: str) -> float:
+        """Extract years of experience"""
         patterns = [
-            r'(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)',
-            r'experience[:\s]*(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)',
-            r'(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)'
+            r'(\d+)\+?\s*(?:years?|yrs?)[\s\w]*(?:of\s+)?experience',
+            r'experience[:\s]+(\d+)\+?\s*(?:years?|yrs?)',
+            r'(\d+)\+?\s*(?:years?|yrs?)\s+experience'
         ]
         
         max_years = 0.0
@@ -61,71 +59,36 @@ class ResumeParser:
             matches = re.findall(pattern, text.lower())
             for match in matches:
                 years = float(match)
-                if years > max_years and years < 50:
-                    max_years = years
+                if 0 < years < 50:
+                    max_years = max(max_years, years)
         
-        # Extract experience sections
-        experiences = self._extract_experience_sections(text)
-        
-        return max_years, experiences
+        return max_years
     
-    def _extract_experience_sections(self, text: str) -> List[Dict]:
-        """Extract individual job experiences"""
-        experiences = []
-        
-        # Look for date patterns (e.g., "2020-2023", "Jan 2020 - Present")
-        date_pattern = r'(\d{4}|\w{3,9}\s+\d{4})\s*[-–—]\s*(\d{4}|\w{3,9}\s+\d{4}|Present|Current)'
-        matches = re.finditer(date_pattern, text, re.IGNORECASE)
-        
-        for match in matches:
-            start_date = match.group(1)
-            end_date = match.group(2)
-            
-            # Extract surrounding context (job title and company)
-            start_pos = max(0, match.start() - 200)
-            end_pos = min(len(text), match.end() + 200)
-            context = text[start_pos:end_pos]
-            
-            experiences.append({
-                'start_date': start_date,
-                'end_date': end_date,
-                'context': context.strip()
-            })
-        
-        return experiences[:10]  # Limit to 10 most recent
-    
-    def extract_education(self, text: str) -> Tuple[int, List[str]]:
-        """Extract education level and degrees"""
+    def extract_education(self, text: str) -> str:
+        """Extract highest education level"""
         text_lower = text.lower()
-        max_level = 0
-        found_degrees = []
         
-        for degree, level in self.DEGREE_LEVELS.items():
-            if re.search(r'\b' + re.escape(degree) + r'\b', text_lower):
-                found_degrees.append(degree)
-                if level > max_level:
-                    max_level = level
+        if re.search(r'\b(phd|ph\.d|doctorate|doctoral)\b', text_lower):
+            return 'phd'
+        elif re.search(r'\b(master|masters|mba|m\.s|m\.tech|m\.e|m\.sc)\b', text_lower):
+            return 'master'
+        elif re.search(r'\b(bachelor|bachelors|b\.s|b\.tech|b\.e|b\.sc|undergraduate)\b', text_lower):
+            return 'bachelor'
         
-        return max_level, list(set(found_degrees))
+        return 'none'
     
     def parse_resume(self, file_content: bytes) -> Dict:
-        """Complete resume parsing"""
+        """Parse resume and extract all information"""
         text = self.parse_pdf(file_content)
         
         if not text.strip():
             raise ValueError("Could not extract text from PDF")
         
-        skills = self.extract_skills(text)
-        experience_years, experience_entries = self.extract_experience(text)
-        education_level, degrees = self.extract_education(text)
-        
         return {
             'text': text,
-            'skills': skills,
-            'experience_years': experience_years,
-            'experience_entries': experience_entries,
-            'education_level': education_level,
-            'degrees': degrees
+            'skills': self.extract_skills(text),
+            'experience_years': self.extract_experience_years(text),
+            'education': self.extract_education(text)
         }
 
 class JobParser:
@@ -133,18 +96,13 @@ class JobParser:
         self.resume_parser = ResumeParser()
     
     def parse_job_description(self, description: str) -> Dict:
-        """Parse job description for structured data"""
-        skills = self.resume_parser.extract_skills(description)
-        experience_years, _ = self.resume_parser.extract_experience(description)
-        education_level, _ = self.resume_parser.extract_education(description)
-        
+        """Parse job description"""
         return {
-            'required_skills': skills,
-            'experience_required': experience_years,
-            'education_required': education_level
+            'required_skills': self.resume_parser.extract_skills(description),
+            'experience_required': self.resume_parser.extract_experience_years(description),
+            'education_required': self.resume_parser.extract_education(description)
         }
 
-# Singleton instances
 _resume_parser = None
 _job_parser = None
 

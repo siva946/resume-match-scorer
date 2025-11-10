@@ -1,4 +1,4 @@
-# Jobalytics MVP
+# ResumSync MVP
 
 Resume and job matching platform using semantic analysis with SentenceTransformers.
 

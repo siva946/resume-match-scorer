@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Jobalytics Job Matcher",
-  "version": "2.0.0",
+  "name": "ResumSync Job Matcher",
+  "version": "2.1.0",
   "description": "See resume match scores on Naukri, Indeed and LinkedIn job pages",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [

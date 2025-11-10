@@ -13,7 +13,7 @@
 Open Command Prompt and run:
 
 ```bash
-cd e:\Jobalytics
+cd e:\ResumSync
 setup-backend.bat
 ```
 
@@ -27,7 +27,7 @@ This will:
 Open a NEW Command Prompt and run:
 
 ```bash
-cd e:\Jobalytics
+cd e:\ResumSync
 setup-frontend.bat
 ```
 
@@ -36,7 +36,7 @@ This will install all React dependencies.
 ### 3. Run Backend
 
 ```bash
-cd e:\Jobalytics
+cd e:\ResumSync
 run-backend.bat
 ```
 
@@ -47,7 +47,7 @@ Backend will start at http://localhost:8000
 Open a NEW Command Prompt and run:
 
 ```bash
-cd e:\Jobalytics
+cd e:\ResumSync
 run-frontend.bat
 ```
 
@@ -58,7 +58,7 @@ Frontend will start at http://localhost:3000
 1. Open Chrome: `chrome://extensions/`
 2. Enable "Developer mode" (top right)
 3. Click "Load unpacked"
-4. Select: `e:\Jobalytics\chrome-extension`
+4. Select: `e:\ResumSync\chrome-extension`
 
 ## Usage
 
