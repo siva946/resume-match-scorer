@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -16,9 +16,10 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 init_db()
@@ -214,6 +215,10 @@ async def test_extraction(request: dict):
         "extracted_experience": parsed['experience_required'],
         "extracted_education": parsed['education_required']
     }
+
+@app.get("/")
+async def root():
+    return {"status": "ResumSync API is running"}
 
 @app.get("/health")
 async def health():
