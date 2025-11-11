@@ -1,4 +1,4 @@
-const API_URL = 'https://resumsync.onrender.com';
+const API_URL =process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 let matchScoreWidget = null;
 let demoMode = false;

@@ -15,7 +15,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://resumsync.vercel.app"],
+    allow_origins=["https://resumsync.vercel.app","http://localhost:3000","*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -150,6 +150,22 @@ async def list_resumes():
 async def list_jobs():
     return JobDB.list_jobs()
 
+@app.delete("/api/jobs/{job_id}")
+async def delete_job(job_id: int):
+    job = JobDB.get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    JobDB.delete_job(job_id)
+    return {"message": "Job deleted successfully"}
+
+@app.delete("/api/resumes/{resume_id}")
+async def delete_resume(resume_id: int):
+    resume = ResumeDB.get_resume(resume_id)
+    if not resume:
+        raise HTTPException(404, "Resume not found")
+    ResumeDB.delete_resume(resume_id)
+    return {"message": "Resume deleted successfully"}
+
 @app.post("/api/match-job")
 async def match_job(request: MatchJobRequest):
     resume_data = ResumeDB.get_resume(request.resume_id)
@@ -222,9 +238,3 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-if __name__ == "__main__":
-    import uvicorn
-    import os
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://resumsync.onrender.com';
+const API_URL =process.env.REACT_APP_API_URL || "http://localhost:8000";
 
 function App() {
   const [resumes, setResumes] = useState([]);
@@ -141,7 +141,7 @@ function App() {
                 <div key={match.job_id} className="match-card">
                   <div className="match-header">
                     <h3>{match.title}</h3>
-                    <span className="score">{(match.score * 100).toFixed(1)}%</span>
+                    <span className="score">{(match.score*100).toFixed(1)}%</span>
                   </div>
                   <p className="company">{match.company}</p>
                   <p className="description">{match.description}...</p>

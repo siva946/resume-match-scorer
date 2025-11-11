@@ -154,6 +154,15 @@ class ResumeDB:
         resumes = [{"id": r[0], "filename": r[1], "created_at": r[2]} for r in cur.fetchall()]
         conn.close()
         return resumes
+    
+    @staticmethod
+    def delete_resume(resume_id: int):
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM resume_skills WHERE resume_id = ?", (resume_id,))
+        cur.execute("DELETE FROM resumes WHERE id = ?", (resume_id,))
+        conn.commit()
+        conn.close()
 
 class JobDB:
     @staticmethod
@@ -222,6 +231,15 @@ class JobDB:
         jobs = [{"id": j[0], "title": j[1], "company": j[2], "url": j[3], "created_at": j[4]} for j in cur.fetchall()]
         conn.close()
         return jobs
+    
+    @staticmethod
+    def delete_job(job_id: int):
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM job_skills WHERE job_id = ?", (job_id,))
+        cur.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
 
 class MatchDB:
     @staticmethod

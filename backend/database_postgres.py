@@ -150,6 +150,15 @@ class ResumeDB:
         resumes = [dict(r) for r in cur.fetchall()]
         conn.close()
         return resumes
+    
+    @staticmethod
+    def delete_resume(resume_id: int):
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM resume_skills WHERE resume_id = %s", (resume_id,))
+        cur.execute("DELETE FROM resumes WHERE id = %s", (resume_id,))
+        conn.commit()
+        conn.close()
 
 class JobDB:
     @staticmethod
@@ -218,6 +227,15 @@ class JobDB:
         jobs = [dict(j) for j in cur.fetchall()]
         conn.close()
         return jobs
+    
+    @staticmethod
+    def delete_job(job_id: int):
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM job_skills WHERE job_id = %s", (job_id,))
+        cur.execute("DELETE FROM jobs WHERE id = %s", (job_id,))
+        conn.commit()
+        conn.close()
 
 class MatchDB:
     @staticmethod
