@@ -202,7 +202,7 @@ function checkAndShowMatch() {
     const isJobPage = 
       (window.location.hostname.includes('naukri.com') && (currentUrl.includes('/job-listings-') || currentUrl.includes('/jobDetail/'))) ||
       (window.location.hostname.includes('indeed.com') && (currentUrl.includes('vjk=') || currentUrl.includes('/viewjob?'))) ||
-      (window.location.hostname.includes('linkedin.com') && (currentUrl.includes('/jobs/view/') || currentUrl.includes('/jobs/search/?currentJobId=')));
+      (window.location.hostname.includes('linkedin.com') && (currentUrl.includes('/jobs') || currentUrl.includes('/jobs/search/?currentJobId=')));
     
     if (isJobPage) {
       if (matchScoreWidget) {
