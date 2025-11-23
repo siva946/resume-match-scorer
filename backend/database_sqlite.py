@@ -1,29 +1,22 @@
-import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import sqlite3
 import json
 from typing import List, Dict, Optional
+import os
 
-def get_db_url():
-    # amazonq-ignore-next-line
-    return os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/resumsync').replace('postgres://', 'postgresql://')
+DB_PATH = os.path.join(os.path.dirname(__file__), 'resumsync.db')
 
 def get_db():
-    db_url = get_db_url()
-    if not db_url:
-        raise ValueError("DATABASE_URL environment variable not set")
-    return psycopg2.connect(db_url)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_db():
-    try:
-        conn = get_db()
-    except Exception:
-        return
+    conn = get_db()
     cur = conn.cursor()
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS resumes (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT NOT NULL,
             text TEXT NOT NULL,
             embedding TEXT NOT NULL,
@@ -35,7 +28,7 @@ def init_db():
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS resume_skills (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             resume_id INTEGER NOT NULL,
             skill TEXT NOT NULL,
             FOREIGN KEY (resume_id) REFERENCES resumes(id) ON DELETE CASCADE
@@ -44,7 +37,7 @@ def init_db():
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             company TEXT NOT NULL,
             description TEXT NOT NULL,
@@ -58,7 +51,7 @@ def init_db():
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS job_skills (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             job_id INTEGER NOT NULL,
             skill TEXT NOT NULL,
             FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
@@ -67,7 +60,7 @@ def init_db():
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS match_results (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             resume_id INTEGER NOT NULL,
             job_id INTEGER NOT NULL,
             overall_score REAL NOT NULL,
@@ -85,10 +78,10 @@ def init_db():
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS matched_skills (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             match_result_id INTEGER NOT NULL,
             skill TEXT NOT NULL,
-            is_matched BOOLEAN NOT NULL,
+            is_matched INTEGER NOT NULL,
             FOREIGN KEY (match_result_id) REFERENCES match_results(id) ON DELETE CASCADE
         )
     """)
@@ -111,13 +104,13 @@ class ResumeDB:
             cur.execute("DELETE FROM resumes")
             
             cur.execute(
-                "INSERT INTO resumes (filename, text, embedding, experience_years, education) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                "INSERT INTO resumes (filename, text, embedding, experience_years, education) VALUES (?, ?, ?, ?, ?)",
                 (filename, text, json.dumps(embedding), experience_years, education)
             )
-            resume_id = cur.fetchone()[0]
+            resume_id = cur.lastrowid
             
             for skill in skills:
-                cur.execute("INSERT INTO resume_skills (resume_id, skill) VALUES (%s, %s)", (resume_id, skill))
+                cur.execute("INSERT INTO resume_skills (resume_id, skill) VALUES (?, ?)", (resume_id, skill))
             
             conn.commit()
             return resume_id
@@ -131,15 +124,15 @@ class ResumeDB:
     def get_resume(resume_id: int) -> Optional[Dict]:
         conn = get_db()
         try:
-            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur = conn.cursor()
             
-            cur.execute("SELECT id, filename, text, embedding, experience_years, education FROM resumes WHERE id = %s", (resume_id,))
+            cur.execute("SELECT id, filename, text, embedding, experience_years, education FROM resumes WHERE id = ?", (resume_id,))
             resume = cur.fetchone()
             
             if not resume:
                 return None
             
-            cur.execute("SELECT skill FROM resume_skills WHERE resume_id = %s", (resume_id,))
+            cur.execute("SELECT skill FROM resume_skills WHERE resume_id = ?", (resume_id,))
             skills = [row['skill'] for row in cur.fetchall()]
             
             return {
@@ -158,7 +151,7 @@ class ResumeDB:
     def list_resumes() -> List[Dict]:
         conn = get_db()
         try:
-            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur = conn.cursor()
             cur.execute("SELECT id, filename, created_at FROM resumes ORDER BY created_at DESC")
             resumes = [dict(r) for r in cur.fetchall()]
             return resumes
@@ -170,8 +163,8 @@ class ResumeDB:
         conn = get_db()
         try:
             cur = conn.cursor()
-            cur.execute("DELETE FROM resume_skills WHERE resume_id = %s", (resume_id,))
-            cur.execute("DELETE FROM resumes WHERE id = %s", (resume_id,))
+            cur.execute("DELETE FROM resume_skills WHERE resume_id = ?", (resume_id,))
+            cur.execute("DELETE FROM resumes WHERE id = ?", (resume_id,))
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -189,13 +182,13 @@ class JobDB:
             cur = conn.cursor()
             
             cur.execute(
-                "INSERT INTO jobs (title, company, description, url, embedding, experience_required, education_required) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                "INSERT INTO jobs (title, company, description, url, embedding, experience_required, education_required) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (title, company, description, url, json.dumps(embedding), experience_required, education_required)
             )
-            job_id = cur.fetchone()[0]
+            job_id = cur.lastrowid
             
             for skill in required_skills:
-                cur.execute("INSERT INTO job_skills (job_id, skill) VALUES (%s, %s)", (job_id, skill))
+                cur.execute("INSERT INTO job_skills (job_id, skill) VALUES (?, ?)", (job_id, skill))
             
             conn.commit()
             return job_id
@@ -209,15 +202,15 @@ class JobDB:
     def get_job(job_id: int) -> Optional[Dict]:
         conn = get_db()
         try:
-            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur = conn.cursor()
             
-            cur.execute("SELECT id, title, company, description, url, embedding, experience_required, education_required FROM jobs WHERE id = %s", (job_id,))
+            cur.execute("SELECT id, title, company, description, url, embedding, experience_required, education_required FROM jobs WHERE id = ?", (job_id,))
             job = cur.fetchone()
             
             if not job:
                 return None
             
-            cur.execute("SELECT skill FROM job_skills WHERE job_id = %s", (job_id,))
+            cur.execute("SELECT skill FROM job_skills WHERE job_id = ?", (job_id,))
             skills = [row['skill'] for row in cur.fetchall()]
             
             return {
@@ -238,7 +231,7 @@ class JobDB:
     def get_all_jobs() -> List[Dict]:
         conn = get_db()
         try:
-            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur = conn.cursor()
             cur.execute("SELECT id FROM jobs")
             job_ids = [row['id'] for row in cur.fetchall()]
             return [JobDB.get_job(job_id) for job_id in job_ids]
@@ -249,7 +242,7 @@ class JobDB:
     def list_jobs() -> List[Dict]:
         conn = get_db()
         try:
-            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur = conn.cursor()
             cur.execute("SELECT id, title, company, url, created_at FROM jobs ORDER BY created_at DESC")
             jobs = [dict(j) for j in cur.fetchall()]
             return jobs
@@ -261,8 +254,8 @@ class JobDB:
         conn = get_db()
         try:
             cur = conn.cursor()
-            cur.execute("DELETE FROM job_skills WHERE job_id = %s", (job_id,))
-            cur.execute("DELETE FROM jobs WHERE id = %s", (job_id,))
+            cur.execute("DELETE FROM job_skills WHERE job_id = ?", (job_id,))
+            cur.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -285,19 +278,19 @@ class MatchDB:
                 INSERT INTO match_results 
                 (resume_id, job_id, overall_score, skills_score, experience_score, 
                  education_score, semantic_score, matched_skills_count, total_required_skills)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (resume_id, job_id, overall_score, skills_score, experience_score,
                   education_score, semantic_score, len(matched_skills), total_required))
             
-            match_id = cur.fetchone()[0]
+            match_id = cur.lastrowid
             
             for skill in matched_skills:
-                cur.execute("INSERT INTO matched_skills (match_result_id, skill, is_matched) VALUES (%s, %s, %s)",
-                           (match_id, skill, True))
+                cur.execute("INSERT INTO matched_skills (match_result_id, skill, is_matched) VALUES (?, ?, ?)",
+                           (match_id, skill, 1))
             
             for skill in missing_skills:
-                cur.execute("INSERT INTO matched_skills (match_result_id, skill, is_matched) VALUES (%s, %s, %s)",
-                           (match_id, skill, False))
+                cur.execute("INSERT INTO matched_skills (match_result_id, skill, is_matched) VALUES (?, ?, ?)",
+                           (match_id, skill, 0))
             
             conn.commit()
             return match_id

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const API_URL =process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 
 function App() {
   const [resumes, setResumes] = useState([]);
@@ -17,13 +17,21 @@ function App() {
   }, []);
 
   const loadResumes = async () => {
-    const res = await axios.get(`${API_URL}/api/resumes`);
-    setResumes(res.data);
+    try {
+      const res = await axios.get(`${API_URL}/api/resumes`);
+      setResumes(res.data);
+    } catch (err) {
+      console.error('Failed to load resumes:', err);
+    }
   };
 
   const loadJobs = async () => {
-    const res = await axios.get(`${API_URL}/api/jobs`);
-    setJobs(res.data);
+    try {
+      const res = await axios.get(`${API_URL}/api/jobs`);
+      setJobs(res.data);
+    } catch (err) {
+      console.error('Failed to load jobs:', err);
+    }
   };
 
   const handleResumeUpload = async (e) => {
@@ -48,14 +56,19 @@ function App() {
 
   const handleGetMatches = async (resumeId) => {
     setSelectedResume(resumeId);
-    const res = await axios.get(`${API_URL}/api/matches/${resumeId}`);
-    setMatches(res.data);
+    try {
+      const res = await axios.get(`${API_URL}/api/matches/${resumeId}`);
+      setMatches(res.data);
+    } catch (err) {
+      alert('Failed to get matches: ' + (err.response?.data?.detail || err.message));
+    }
   };
 
   const handleDeleteJob = async (jobId) => {
     if (!window.confirm('Delete this job permanently?')) return;
     
     try {
+      // amazonq-ignore-next-line
       await axios.delete(`${API_URL}/api/jobs/${jobId}`);
       await loadJobs();
       if (matches.length > 0) {

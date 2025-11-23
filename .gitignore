@@ -13,3 +13,7 @@ postgres_data/
 build/
 dist/
 *.egg-info/
+# SQLite database (local only)
+*.db
+resumsync.db
+.env.local

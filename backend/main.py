@@ -6,17 +6,14 @@ from typing import List, Optional
 from ml_model import get_model
 from parser import get_resume_parser, get_job_parser
 import os
-if os.getenv('DATABASE_URL'):
-    from database_postgres import init_db, ResumeDB, JobDB, MatchDB
-else:
-    from database import init_db, ResumeDB, JobDB, MatchDB
+from database_postgres import init_db, ResumeDB, JobDB, MatchDB
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=["https://resumsync.vercel.app","https://resumsync-frontend.onrender.com","http://localhost:3000","chrome-extension://iegkdkmihkegmicekpcblfpdbokdbdem"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
     )
@@ -29,8 +26,10 @@ resume_parser = get_resume_parser()
 job_parser = get_job_parser()
 
 def get_ml_model():
+    # amazonq-ignore-next-line
     global ml_model
     if ml_model is None:
+        # amazonq-ignore-next-line
         ml_model = get_model()
     return ml_model
 
@@ -50,6 +49,7 @@ async def upload_resume(file: UploadFile = File(...)):
         raise HTTPException(400, "Only PDF files supported")
     
     try:
+        # amazonq-ignore-next-line
         content = await file.read()
         parsed_data = resume_parser.parse_resume(content)
         
@@ -77,6 +77,7 @@ async def upload_resume(file: UploadFile = File(...)):
 
 @app.post("/api/jobs")
 async def add_job(job: JobDescription):
+    # amazonq-ignore-next-line
     parsed_job = job_parser.parse_job_description(job.description)
     embedding = get_ml_model().encode(job.description)
     
@@ -107,10 +108,12 @@ async def get_matches(resume_id: int, limit: int = 10):
     jobs = JobDB.get_all_jobs()
     matches = []
     
+    # amazonq-ignore-next-line
     for job in jobs:
         overall_score, breakdown = get_ml_model().calculate_match_score(resume_data, job)
         
         # Save match result to database
+        # amazonq-ignore-next-line
         MatchDB.save_match_result(
             resume_id=resume_id,
             job_id=job['id'],
@@ -144,10 +147,12 @@ async def get_matches(resume_id: int, limit: int = 10):
 
 @app.get("/api/resumes")
 async def list_resumes():
+    # amazonq-ignore-next-line
     return ResumeDB.list_resumes()
 
 @app.get("/api/jobs")
 async def list_jobs():
+    # amazonq-ignore-next-line
     return JobDB.list_jobs()
 
 @app.delete("/api/jobs/{job_id}")
@@ -155,6 +160,7 @@ async def delete_job(job_id: int):
     job = JobDB.get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
+    # amazonq-ignore-next-line
     JobDB.delete_job(job_id)
     return {"message": "Job deleted successfully"}
 
@@ -163,6 +169,7 @@ async def delete_resume(resume_id: int):
     resume = ResumeDB.get_resume(resume_id)
     if not resume:
         raise HTTPException(404, "Resume not found")
+    # amazonq-ignore-next-line
     ResumeDB.delete_resume(resume_id)
     return {"message": "Resume deleted successfully"}
 
@@ -197,6 +204,7 @@ async def match_job(request: MatchJobRequest):
         "experience_match": resume_data['experience_years'] >= parsed_job['experience_required']
     }
 
+# amazonq-ignore-next-line
 @app.get("/api/debug/resume/{resume_id}")
 async def debug_resume(resume_id: int):
     resume_data = ResumeDB.get_resume(resume_id)

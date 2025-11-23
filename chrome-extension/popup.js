@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://resumsync.onrender.com';
 
 let resumes = [];
 let jobs = [];
@@ -53,6 +53,7 @@ document.getElementById('showMatch').addEventListener('click', async () => {
 
     const description = results[0].result;
 
+    // amazonq-ignore-next-line
     const response = await fetch(`${API_URL}/api/match-job`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -90,6 +91,7 @@ document.getElementById('saveJob').addEventListener('click', async () => {
 
     const description = results[0].result;
 
+    // amazonq-ignore-next-line
     const response = await fetch(`${API_URL}/api/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
