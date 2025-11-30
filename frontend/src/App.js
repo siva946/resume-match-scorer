@@ -100,50 +100,87 @@ function App() {
       </header>
 
       <div className="container">
+        <div className="dashboard-grid">
+          <div className="stat-card">
+            <div className="stat-number">{resumes.length}</div>
+            <div className="stat-label">Resumes</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number">{jobs.length}</div>
+            <div className="stat-label">Jobs</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-number">{matches.length}</div>
+            <div className="stat-label">Matches</div>
+          </div>
+        </div>
+
         <section className="upload-section">
           <h2>Upload Resume</h2>
-          <input 
-            type="file" 
-            accept=".pdf" 
-            onChange={handleResumeUpload}
-            disabled={uploading}
-          />
-          {uploading && <p>Uploading...</p>}
+          <label className="upload-area" htmlFor="resume-upload">
+            <input 
+              id="resume-upload"
+              type="file" 
+              accept=".pdf" 
+              onChange={handleResumeUpload}
+              disabled={uploading}
+            />
+            <div className="upload-text">
+              {uploading ? 'Uploading...' : 'Click to upload PDF resume'}
+            </div>
+            <div className="upload-hint">PDF files only</div>
+          </label>
         </section>
 
         <section className="resumes-section">
-          <h2>Your Resume ({resumes.length})</h2>
-          <div className="list">
-            {resumes.map(resume => (
-              <div key={resume.id} className="item">
-                <span>{resume.filename}</span>
-                <div>
-                  <button onClick={() => handleGetMatches(resume.id)}>
-                    Find Matches
-                  </button>
-                  <button onClick={() => handleDeleteResume(resume.id)} className="delete-btn">
-                    Delete
-                  </button>
+          <h2>Your Resumes</h2>
+          {resumes.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-text">No resumes uploaded yet</div>
+            </div>
+          ) : (
+            <div className="list">
+              {resumes.map(resume => (
+                <div key={resume.id} className="item">
+                  <div className="item-content">
+                    <div className="item-title">{resume.filename}</div>
+                    <div className="item-subtitle">ID: {resume.id}</div>
+                  </div>
+                  <div>
+                    <button onClick={() => handleGetMatches(resume.id)}>
+                      Find Matches
+                    </button>
+                    <button onClick={() => handleDeleteResume(resume.id)} className="delete-btn">
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="jobs-section">
-          <h2>Jobs in Database ({jobs.length})</h2>
-          <div className="list">
-            {jobs.map(job => (
-              <div key={job.id} className="item">
-                <div>
-                  <strong>{job.title}</strong> at {job.company}
+          <h2>Jobs Database</h2>
+          {jobs.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-text">No jobs saved yet. Use the Chrome extension to add jobs.</div>
+            </div>
+          ) : (
+            <div className="list">
+              {jobs.map(job => (
+                <div key={job.id} className="item">
+                  <div className="item-content">
+                    <div className="item-title">{job.title}</div>
+                    <div className="item-subtitle">{job.company}</div>
+                  </div>
+                  <button onClick={() => handleDeleteJob(job.id)} className="delete-btn">
+                    Delete
+                  </button>
                 </div>
-                <button onClick={() => handleDeleteJob(job.id)} className="delete-btn">
-                  Delete
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {matches.length > 0 && (
@@ -157,7 +194,7 @@ function App() {
                     <span className="score">{(match.score*100).toFixed(1)}%</span>
                   </div>
                   <p className="company">{match.company}</p>
-                  <p className="description">{match.description}...</p>
+                  <p className="description">{match.description.substring(0, 150)}...</p>
                 </div>
               ))}
             </div>

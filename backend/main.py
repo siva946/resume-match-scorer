@@ -6,7 +6,7 @@ from typing import List, Optional
 from ml_model import get_model
 from parser import get_resume_parser, get_job_parser
 import os
-from database_postgres import init_db, ResumeDB, JobDB, MatchDB
+from database_sqlite import init_db, ResumeDB, JobDB, MatchDB
 
 app = FastAPI()
 

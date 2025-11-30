@@ -13,14 +13,13 @@ async function checkBackendAvailable() {
 }
 
 async function getActiveResume() {
-  if (demoMode) return { id: 'demo', text: 'Demo resume' };
   try {
     const response = await fetch(`${API_URL}/api/resumes`, { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) throw new Error('Backend unavailable');
     const resumes = await response.json();
     return resumes.length > 0 ? resumes[0] : null;
   } catch {
-    demoMode = true;
-    return { id: 'demo', text: 'Demo resume' };
+    return null;
   }
 }
 
@@ -32,16 +31,13 @@ function calculateDemoScore(jobDescription) {
 }
 
 async function calculateMatchScore(jobDescription) {
-  const resume = await getActiveResume();
-  if (!resume) {
-    return { error: 'No resume uploaded', score: null };
-  }
-
-  if (demoMode) {
-    return { score: calculateDemoScore(jobDescription) / 100, error: null };
-  }
-
   try {
+    const resume = await getActiveResume();
+    if (!resume) {
+      demoMode = true;
+      return { score: calculateDemoScore(jobDescription) / 100, error: null };
+    }
+
     // amazonq-ignore-next-line
     const response = await fetch(`${API_URL}/api/match-job`, {
       method: 'POST',
@@ -53,12 +49,10 @@ async function calculateMatchScore(jobDescription) {
       signal: AbortSignal.timeout(5000)
     });
 
-    if (!response.ok) {
-      demoMode = true;
-      return { score: calculateDemoScore(jobDescription) / 100, error: null };
-    }
+    if (!response.ok) throw new Error('API error');
 
     const result = await response.json();
+    demoMode = false;
     return { score: result.score, error: null };
   } catch {
     demoMode = true;
@@ -97,15 +91,15 @@ function createMatchWidget(score) {
 
   matchScoreWidget = document.createElement('div');
   matchScoreWidget.id = 'jobalytics-widget';
-  const demoLabel = demoMode ? '<div style="font-size: 11px; color: #ff9800; margin-top: 5px;">Demo Mode - Connect backend for real scores</div>' : '';
+  const demoLabel = demoMode ? '<div style="font-size: 11px; color: #856404; margin-top: 8px; font-weight: 500;">Demo Mode - Connect backend for real scores</div>' : '';
   // amazonq-ignore-next-line
   matchScoreWidget.innerHTML = `
-    <div class="jobalytics-header">
+    <div class="jobalytics-header" id="jobalytics-drag-handle">
       <span>Jobalytics Match</span>
       <button id="jobalytics-close">×</button>
     </div>
-    <div class="jobalytics-score">
-      <div class="score-circle" style="background: conic-gradient(#667eea ${score * 3.6}deg, #e0e0e0 0deg)">
+    <div class="jobalytics-score" id="jobalytics-score-handle">
+      <div class="score-circle" style="background: conic-gradient(#2c3e50 ${score * 3.6}deg, #e9ecef 0deg)">
         <div class="score-inner">
           <span class="score-value">${Math.round(score)}%</span>
         </div>
@@ -123,22 +117,49 @@ function createMatchWidget(score) {
   });
 
   document.getElementById('jobalytics-save').addEventListener('click', saveCurrentJob);
+  
+  makeDraggable(matchScoreWidget);
+}
+
+function makeDraggable(element) {
+  let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+  const header = element.querySelector('#jobalytics-drag-handle');
+  const scorer=element.querySelector('#jobalytics-score-handle')
+  header.onmousedown = dragMouseDown;
+  scorer.onmousedown=dragMouseDown;
+  function dragMouseDown(e) {
+    e.preventDefault();
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+    document.onmouseup = closeDragElement;
+    document.onmousemove = elementDrag;
+  }
+
+  function elementDrag(e) {
+    e.preventDefault();
+    pos1 = pos3 - e.clientX;
+    pos2 = pos4 - e.clientY;
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+    element.style.top = (element.offsetTop - pos2) + 'px';
+    element.style.left = (element.offsetLeft - pos1) + 'px';
+    element.style.right = 'auto';
+  }
+
+  function closeDragElement() {
+    document.onmouseup = null;
+    document.onmousemove = null;
+  }
 }
 
 function getScoreLabel(score) {
-  if (score >= 80) return 'Excellent Match!';
+  if (score >= 80) return 'Excellent Match';
   if (score >= 60) return 'Good Match';
   if (score >= 40) return 'Fair Match';
   return 'Low Match';
 }
 
 async function saveCurrentJob() {
-  if (demoMode) {
-    // amazonq-ignore-next-line
-    alert('Demo Mode: Job saved locally!\n\nConnect to Jobalytics backend to sync jobs to your dashboard.');
-    return;
-  }
-
   const jobDescription = extractJobDescription();
   let title = 'Job Opening';
   let company = 'Unknown';
@@ -163,7 +184,7 @@ async function saveCurrentJob() {
   
   try {
     // amazonq-ignore-next-line
-    await fetch(`${API_URL}/api/jobs`, {
+    const response = await fetch(`${API_URL}/api/jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -174,6 +195,8 @@ async function saveCurrentJob() {
       }),
       signal: AbortSignal.timeout(5000)
     });
+    
+    if (!response.ok) throw new Error('Save failed');
     // amazonq-ignore-next-line
     alert('Job saved successfully!');
   } catch (error) {
