@@ -3,11 +3,10 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from pydantic import BaseModel
 from config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
 class TokenData(BaseModel):
@@ -19,15 +18,21 @@ class User(BaseModel):
     email: str
     hashed_password: str
 
+MAX_BCRYPT_PASSWORD_BYTES = 72
+
+def _to_bcrypt_bytes(password: str) -> bytes:
+    b = password.encode('utf-8')
+    if len(b) > MAX_BCRYPT_PASSWORD_BYTES:
+        # bcrypt silently truncates; do it explicitly to avoid runtime errors
+        b = b[:MAX_BCRYPT_PASSWORD_BYTES]
+    return b
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    # Encode to bytes and truncate to 72 bytes for bcrypt
-    password_bytes = plain_password.encode('utf-8')[:72]
-    return pwd_context.verify(password_bytes.decode('utf-8'), hashed_password)
+    return bcrypt.checkpw(_to_bcrypt_bytes(plain_password), hashed_password.encode('utf-8'))
 
 def get_password_hash(password: str) -> str:
-    # Encode to bytes and truncate to 72 bytes for bcrypt
-    password_bytes = password.encode('utf-8')[:72]
-    return pwd_context.hash(password_bytes.decode('utf-8'))
+    pw_bytes = _to_bcrypt_bytes(password)
+    return bcrypt.hashpw(pw_bytes, bcrypt.gensalt()).decode('utf-8')
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
