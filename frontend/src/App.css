@@ -19,6 +19,9 @@ header {
   color: white;
   padding: 2rem;
   border-bottom: 3px solid #34495e;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 header h1 {
@@ -30,6 +33,48 @@ header h1 {
 header p {
   font-size: 1rem;
   color: #ecf0f1;
+}
+
+.logout-btn {
+  background: #e74c3c;
+  padding: 0.6rem 1.2rem;
+}
+
+.logout-btn:hover {
+  background: #c0392b;
+}
+
+.auth-section {
+  max-width: 400px;
+  margin: 4rem auto;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-input {
+  padding: 0.8rem;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.auth-button {
+  padding: 0.8rem;
+  font-size: 1rem;
+}
+
+.toggle-auth {
+  background: transparent;
+  color: #2c3e50;
+  border: 1px solid #2c3e50;
+}
+
+.toggle-auth:hover {
+  background: #f8f9fa;
 }
 
 .container {

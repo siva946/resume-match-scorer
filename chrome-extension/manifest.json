@@ -8,7 +8,8 @@
     "https://*.naukri.com/*",
     "https://*.indeed.com/*",
     "https://*.linkedin.com/*",
-    "https://resumsync.onrender.com/*"
+    "https://resumsync.onrender.com/*",
+    "http://localhost:8000/*"
   ],
   "action": {
     "default_popup": "popup.html",

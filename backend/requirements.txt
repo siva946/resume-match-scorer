@@ -1,8 +1,11 @@
-# amazonq-ignore-next-linefastapi==0.104.1
-uvicorn==0.24.0
-# amazonq-ignore-next-line
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 sentence-transformers==2.7.0
 pdfplumber==0.10.3
 numpy>=1.24.0
 psycopg2-binary==2.9.10
+pydantic-settings==2.1.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-magic==0.4.27

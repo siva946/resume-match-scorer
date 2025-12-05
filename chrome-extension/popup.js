@@ -1,13 +1,25 @@
-const API_URL = 'http://localhost:8000';
+const API_URL = CONFIG?.API_URL || 'http://localhost:8000';
+
+function getAuthHeaders() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['token'], (result) => {
+      resolve({
+        'Content-Type': 'application/json',
+        'Authorization': result.token ? `Bearer ${result.token}` : ''
+      });
+    });
+  });
+}
 
 let resumes = [];
 let jobs = [];
 
 async function loadData() {
   try {
+    const headers = await getAuthHeaders();
     const [resumesRes, jobsRes] = await Promise.all([
-      fetch(`${API_URL}/api/resumes`),
-      fetch(`${API_URL}/api/jobs`)
+      fetch(`${API_URL}/api/resumes`, { headers }),
+      fetch(`${API_URL}/api/jobs`, { headers })
     ]);
 
     if (!resumesRes.ok || !jobsRes.ok) {
@@ -53,10 +65,10 @@ document.getElementById('showMatch').addEventListener('click', async () => {
 
     const description = results[0].result;
 
-    // amazonq-ignore-next-line
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_URL}/api/match-job`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         resume_id: parseInt(resumeId),
         job_description: description
@@ -91,10 +103,10 @@ document.getElementById('saveJob').addEventListener('click', async () => {
 
     const description = results[0].result;
 
-    // amazonq-ignore-next-line
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_URL}/api/jobs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         title,
         company,

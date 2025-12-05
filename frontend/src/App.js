@@ -4,21 +4,85 @@ import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 
+const api = axios.create({
+  baseURL: API_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 function App() {
   const [resumes, setResumes] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [matches, setMatches] = useState([]);
   const [selectedResume, setSelectedResume] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showLogin, setShowLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
-    loadResumes();
-    loadJobs();
-  }, []);
+    const token = localStorage.getItem('token');
+    if (token) {
+      setIsAuthenticated(true);
+      loadResumes();
+      loadJobs();
+    }
+  }, [isAuthenticated]);
+
+  const handleAuth = async (isLogin) => {
+    if (!email || !password) {
+      alert('Please enter email and password');
+      return;
+    }
+    
+    setAuthLoading(true);
+    try {
+      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const res = await axios.post(`${API_URL}${endpoint}`, { email, password });
+      localStorage.setItem('token', res.data.access_token);
+      setIsAuthenticated(true);
+      setEmail('');
+      setPassword('');
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Authentication failed');
+    }
+    setAuthLoading(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
+    setResumes([]);
+    setJobs([]);
+    setMatches([]);
+  };
 
   const loadResumes = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/resumes`);
+      const res = await api.get('/api/resumes');
       setResumes(res.data);
     } catch (err) {
       console.error('Failed to load resumes:', err);
@@ -27,7 +91,7 @@ function App() {
 
   const loadJobs = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/jobs`);
+      const res = await api.get('/api/jobs');
       setJobs(res.data);
     } catch (err) {
       console.error('Failed to load jobs:', err);
@@ -38,15 +102,22 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File too large. Maximum size: 10MB');
+      return;
+    }
+
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      await axios.post(`${API_URL}/api/resume/upload`, formData);
+      await api.post('/api/resume/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       await loadResumes();
       setMatches([]);
-      alert('Resume uploaded successfully! Old resume replaced.');
+      alert('Resume uploaded successfully!');
     } catch (err) {
       alert('Upload failed: ' + (err.response?.data?.detail || err.message));
     }
@@ -57,7 +128,7 @@ function App() {
   const handleGetMatches = async (resumeId) => {
     setSelectedResume(resumeId);
     try {
-      const res = await axios.get(`${API_URL}/api/matches/${resumeId}`);
+      const res = await api.get(`/api/matches/${resumeId}`);
       setMatches(res.data);
     } catch (err) {
       alert('Failed to get matches: ' + (err.response?.data?.detail || err.message));
@@ -68,8 +139,7 @@ function App() {
     if (!window.confirm('Delete this job permanently?')) return;
     
     try {
-      // amazonq-ignore-next-line
-      await axios.delete(`${API_URL}/api/jobs/${jobId}`);
+      await api.delete(`/api/jobs/${jobId}`);
       await loadJobs();
       if (matches.length > 0) {
         setMatches(matches.filter(m => m.job_id !== jobId));
@@ -83,7 +153,7 @@ function App() {
     if (!window.confirm('Delete this resume permanently?')) return;
     
     try {
-      await axios.delete(`${API_URL}/api/resumes/${resumeId}`);
+      await api.delete(`/api/resumes/${resumeId}`);
       await loadResumes();
       setMatches([]);
       setSelectedResume(null);
@@ -92,11 +162,59 @@ function App() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="App">
+        <header>
+          <h1>ResumSync</h1>
+          <p>Resume & Job Matching Platform</p>
+        </header>
+        <div className="container">
+          <section className="auth-section">
+            <h2>{showLogin ? 'Login' : 'Register'}</h2>
+            <div className="auth-form">
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="auth-input"
+              />
+              <input
+                type="password"
+                placeholder="Password (min 8 characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="auth-input"
+              />
+              <button
+                onClick={() => handleAuth(showLogin)}
+                disabled={authLoading}
+                className="auth-button"
+              >
+                {authLoading ? 'Loading...' : (showLogin ? 'Login' : 'Register')}
+              </button>
+              <button
+                onClick={() => setShowLogin(!showLogin)}
+                className="toggle-auth"
+              >
+                {showLogin ? 'Need an account? Register' : 'Have an account? Login'}
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="App">
       <header>
-        <h1>ResumSync</h1>
-        <p>Resume & Job Matching Platform</p>
+        <div>
+          <h1>ResumSync</h1>
+          <p>Resume & Job Matching Platform</p>
+        </div>
+        <button onClick={handleLogout} className="logout-btn">Logout</button>
       </header>
 
       <div className="container">

@@ -1,7 +1,14 @@
-const API_URL = 'http://localhost:8000';
+const API_URL = typeof CONFIG !== 'undefined' ? CONFIG.API_URL : 'http://localhost:8000';
+
+function getAuthToken() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['token'], (result) => {
+      resolve(result.token || '');
+    });
+  });
+}
 
 let matchScoreWidget = null;
-let demoMode = false;
 
 async function checkBackendAvailable() {
   try {
@@ -14,7 +21,13 @@ async function checkBackendAvailable() {
 
 async function getActiveResume() {
   try {
-    const response = await fetch(`${API_URL}/api/resumes`, { signal: AbortSignal.timeout(3000) });
+    const token = await getAuthToken();
+    const response = await fetch(`${API_URL}/api/resumes`, {
+      signal: AbortSignal.timeout(3000),
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
     if (!response.ok) throw new Error('Backend unavailable');
     const resumes = await response.json();
     return resumes.length > 0 ? resumes[0] : null;
@@ -34,14 +47,16 @@ async function calculateMatchScore(jobDescription) {
   try {
     const resume = await getActiveResume();
     if (!resume) {
-      demoMode = true;
-      return { score: calculateDemoScore(jobDescription) / 100, error: null };
+      return { score: calculateDemoScore(jobDescription) / 100, demo: true };
     }
 
-    // amazonq-ignore-next-line
+    const token = await getAuthToken();
     const response = await fetch(`${API_URL}/api/match-job`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+      },
       body: JSON.stringify({
         resume_id: resume.id,
         job_description: jobDescription
@@ -52,11 +67,9 @@ async function calculateMatchScore(jobDescription) {
     if (!response.ok) throw new Error('API error');
 
     const result = await response.json();
-    demoMode = false;
-    return { score: result.score, error: null };
+    return { score: result.score, demo: false };
   } catch {
-    demoMode = true;
-    return { score: calculateDemoScore(jobDescription) / 100, error: null };
+    return { score: calculateDemoScore(jobDescription) / 100, demo: true };
   }
 }
 
@@ -84,14 +97,14 @@ function extractJobDescription() {
   return bodyText.substring(0, 5000);
 }
 
-function createMatchWidget(score) {
+function createMatchWidget(score, isDemo) {
   if (matchScoreWidget) {
     matchScoreWidget.remove();
   }
 
   matchScoreWidget = document.createElement('div');
   matchScoreWidget.id = 'jobalytics-widget';
-  const demoLabel = demoMode ? '<div style="font-size: 11px; color: #856404; margin-top: 8px; font-weight: 500;">Demo Mode - Connect backend for real scores</div>' : '';
+  const demoLabel = isDemo ? '<div style="font-size: 11px; color: #856404; margin-top: 8px; font-weight: 500;">Demo Mode - Connect backend for real scores</div>' : '';
   // amazonq-ignore-next-line
   matchScoreWidget.innerHTML = `
     <div class="jobalytics-header" id="jobalytics-drag-handle">
@@ -183,25 +196,36 @@ async function saveCurrentJob() {
   }
   
   try {
-    // amazonq-ignore-next-line
+    console.log('Saving job:', { title, company, descLength: jobDescription.length });
+    const token = await getAuthToken();
     const response = await fetch(`${API_URL}/api/jobs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+      },
       body: JSON.stringify({
         title: title,
         company: company,
         description: jobDescription,
         url: window.location.href
-      }),
-      signal: AbortSignal.timeout(5000)
+      })
     });
     
-    if (!response.ok) throw new Error('Save failed');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Save failed:', response.status, errorText);
+      throw new Error(`Save failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('Job saved:', result);
     // amazonq-ignore-next-line
     alert('Job saved successfully!');
   } catch (error) {
+    console.error('Error saving job:', error);
     // amazonq-ignore-next-line
-    alert('Failed to save job. Make sure backend is running on localhost:8000');
+    alert(`Failed to save job: ${error.message}`);
   }
 }
 
@@ -210,12 +234,7 @@ async function showMatchScore() {
     const jobDescription = extractJobDescription();
     const result = await calculateMatchScore(jobDescription);
 
-    if (result.error) {
-      console.log('Jobalytics:', result.error);
-      return;
-    }
-
-    createMatchWidget(result.score * 100);
+    createMatchWidget(result.score * 100, result.demo);
   } catch (error) {
     console.error('Jobalytics error:', error);
   }
