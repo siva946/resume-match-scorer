@@ -1,4 +1,3 @@
-import magic
 from fastapi import UploadFile, HTTPException
 from config import settings
 from logger import logger
@@ -20,14 +19,9 @@ async def validate_pdf_upload(file: UploadFile) -> bytes:
             detail=f"File too large. Maximum size: {settings.max_file_size_mb}MB"
         )
     
-    # Check MIME type using python-magic
-    try:
-        mime = magic.from_buffer(content, mime=True)
-        if mime not in settings.allowed_file_types:
-            raise HTTPException(status_code=400, detail=f"Invalid file type: {mime}")
-    except Exception as e:
-        logger.error(f"MIME type validation failed: {e}")
-        raise HTTPException(status_code=400, detail="Could not validate file type")
+    # Check PDF magic bytes
+    if not content.startswith(b'%PDF'):
+        raise HTTPException(status_code=400, detail="Invalid PDF file")
     
     # Check for malicious content (basic check)
     if b'<script' in content.lower() or b'javascript:' in content.lower():
