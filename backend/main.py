@@ -1,6 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 import asyncio
@@ -29,13 +28,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     max_age=3600
 )
-
-if settings.environment == "production":
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_origins)
 
 resume_parser = get_resume_parser()
 job_parser = get_job_parser()
