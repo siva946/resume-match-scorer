@@ -53,6 +53,17 @@ def init_db():
     db_pool.initialize()
     with db_pool.get_connection() as conn:
         cur = conn.cursor()
+        try:
+            cur.execute("SELECT user_id FROM resumes LIMIT 1")
+        except:
+            logger.info("Dropping old tables to recreate with user_id")
+            cur.execute("DROP TABLE IF EXISTS matched_skills CASCADE")
+            cur.execute("DROP TABLE IF EXISTS match_results CASCADE")
+            cur.execute("DROP TABLE IF EXISTS job_skills CASCADE")
+            cur.execute("DROP TABLE IF EXISTS resume_skills CASCADE")
+            cur.execute("DROP TABLE IF EXISTS jobs CASCADE")
+            cur.execute("DROP TABLE IF EXISTS resumes CASCADE")
+            conn.commit()
         
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
