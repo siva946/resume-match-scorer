@@ -51,11 +51,15 @@ db_pool = DatabasePool()
 
 def init_db():
     db_pool.initialize()
-    with db_pool.get_connection() as conn:
+    conn = db_pool._pool.getconn()
+    try:
         cur = conn.cursor()
+        
+        # Drop old tables if they exist without user_id
         try:
             cur.execute("SELECT user_id FROM resumes LIMIT 1")
         except:
+            conn.rollback()  # Rollback failed transaction
             logger.info("Dropping old tables to recreate with user_id")
             cur.execute("DROP TABLE IF EXISTS matched_skills CASCADE")
             cur.execute("DROP TABLE IF EXISTS match_results CASCADE")
@@ -156,6 +160,10 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_job_skills ON job_skills(job_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_match_results ON match_results(resume_id, job_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        
+        conn.commit()
+    finally:
+        db_pool._pool.putconn(conn)
 
 class UserDB:
     @staticmethod
