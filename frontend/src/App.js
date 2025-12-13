@@ -61,7 +61,7 @@ function App() {
     setAuthLoading(true);
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const res = await axios.post(`${API_URL}${endpoint}`, { email, password });
+      const res = await api.post(endpoint, { email, password });
       localStorage.setItem('token', res.data.access_token);
       setIsAuthenticated(true);
       setEmail('');
